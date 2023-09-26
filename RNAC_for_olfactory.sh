@@ -2,6 +2,7 @@
 
 usage() {
 	cat <<-EOF
+		RNAC_for_olfactory.sh
 		Usage: `basename $0` 
 		Options:
 		    -g: genome.fa
@@ -9,9 +10,18 @@ usage() {
 		    -r: R2.fq
 		    -t: threads
 		    -h: help information
+		
+		Action:
+			-A: do alignment
+			-P: extract contacts
+			-S: 3D genome structure reconstruction
+			-C: contact analysis for olfactory system (specifically, olfactory receptors and Greek islands)
+			-D: 3D structure analysis for olfactory system, similar to -C 
 
-		Github repo: https://github.com/tanlongzhi/dip-c
-		GEO README: ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE121nnn/GSE121791/suppl/GSE121791%5F00README%2Emd%2Etxt
+		See also:
+			Github repo: https://github.com/tanlongzhi/dip-c
+			GEO README: ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE121nnn/GSE121791/suppl/GSE121791%5F00README%2Emd%2Etxt
+
 	EOF
 	exit 1;
 }
@@ -39,10 +49,10 @@ while getopts "g:f:r:o:t:p:s:v:hAPCSD" options; do
 		s) ASSEMBLY=${OPTARG};;
 		v) SNP=${OPTARG};;
 		A) ALIGN=1;;
-		C) CONTACT=1;;
 		P) PARSE=1;;
 		S) MODEL=1;;
-		D) step3=1;;
+		C) CONTACT=1;;
+		D) SPATIAL=1;;
 		h) usage;;
 		*) exit 1;;
 	esac
@@ -91,8 +101,7 @@ if [ ${PARSE-0} == 1 ];then
 	[[ -z ${SNP} || ! -s ${SNP} ]] && { echo "SNP file: not found!"; exit 1; }
 	echo "SNP file: ${SNP}"
 	
-	###### Note: male
-
+	## male
 	hickit.js sam2seg -v ${SNP} ${OUTPUT}/${PREFIX}.sam.gz 2>${OUTPUT}/logs/${PREFIX}_sam2seg.log | hickit.js chronly - | hickit.js bedflt ${PAR} - | gzip > ${OUTPUT}/${PREFIX}.allValidSeg.gz
 	hickit -i ${OUTPUT}/${PREFIX}.allValidSeg.gz -o - 2>${OUTPUT}/logs/${PREFIX}_seg2pairs.log | sed "s/chromosome/chromsize/g" | bgzip > ${OUTPUT}/${PREFIX}.pairs.gz
 	zcat ${OUTPUT}/${PREFIX}.pairs.gz | awk -v FS='\t' -v OFS='\t' '{if(substr($0, 1, 1)=="#"){print}else{$6="+";$7="+";print}}' | bgzip > ${OUTPUT}/${PREFIX}.temp.pairs.gz
@@ -121,22 +130,21 @@ fi
 ################################# 3. modeling #################################
 
 if [ ${MODEL-0} == 1 ];then
-
+	# submit jobs to slurm scheduler
 	for rep in `seq 1 3`;do
-		sbatch -J ${PREFIX} --exclude node[10-11] --partition compute_new -o ${OUTPUT}/logs/${PREFIX}_modeling_rep${rep}.log <<-EOF
+		sbatch -J ${PREFIX} -o ${OUTPUT}/logs/${PREFIX}_modeling_rep${rep}.log <<-EOF
 			#!/bin/bash
 			#SBATCH -c 1
-			#SBATCH --mem 6g
+			#SBATCH --mem 8G
 			#SBATCH --time 2-00:00:00
 
 			hickit -s${rep} -M -i ${OUTPUT}/structure/${PREFIX}.impute.pairs.gz -Sr1m -c1 -r10m -c2 -b4m \
 				-b1m -O ${OUTPUT}/structure/${PREFIX}_1Mb_${rep}.3dg \
 				-b200k -O ${OUTPUT}/structure/${PREFIX}_200kb_${rep}.3dg \
 				-D5 -b50k -O ${OUTPUT}/structure/${PREFIX}_50kb_${rep}.3dg \
-				-D5 -b20k -O ${OUTPUT}/structure/${PREFIX}_20kb_${rep}.3dg \
-				-D5 -b10k -O ${OUTPUT}/structure/${PREFIX}_10kb_${rep}.3dg
+				-D5 -b20k -O ${OUTPUT}/structure/${PREFIX}_20kb_${rep}.3dg 
 
-			RESARR=("1Mb" "200kb" "50kb" "20kb" "10kb")
+			RESARR=("1Mb" "200kb" "50kb" "20kb")
 			for RES in \${RESARR[@]};do
 				${dipc}/hickit_3dg_to_3dg_rescale_unit.sh ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.3dg
 				dip-c clean3 -c ${OUTPUT}/structure/impute.con.gz ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.dip-c.3dg > ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.clean.3dg
@@ -151,12 +159,12 @@ fi
 if [ ${CONTACT-0} == 1 ]; then
 
 	[ -s ${OUTPUT}/features ] || mkdir -p ${OUTPUT}/features
-	[ -s ${OUTPUT}/or ] || mkdir -p ${OUTPUT}/or
+	[ -s ${OUTPUT}/or ] || mkdir -p ${OUTPUT}/or # stands for olfactory receptor 
 	
 	$juicer pre -n ${OUTPUT}/structure/impute.juicer.txt.gz ${OUTPUT}/${PREFIX}.impute.hic ${folder}/mm10.chr.hom.len
 	dip-c color2 -b1000000 -H -c ${folder}/mm10.cpg.1m.txt -s ${OUTPUT}/structure/contacts.con.gz > ${OUTPUT}/features/${PREFIX}_cpg_b1m.color2
 
-	### Enhancers and olfactory receptors are analyses from contact maps with dip-c, fully done!
+	## Enhancers and olfactory receptors analyses 
 
 	echo -e "\n$(date) analyze OR .......... \n"
 	dip-c ard -d10000000 -c ${or_con} -h100000 ${OUTPUT}/structure/contacts.con.gz > ${OUTPUT}/or/${PREFIX}_ors_d10m_h100k.ard
@@ -194,7 +202,7 @@ if [ ${CONTACT-0} == 1 ]; then
 	dip-c ard -d100000 -c ${or_data}/subset_27GIs_2.con -n ${OUTPUT}/structure/contacts.con.gz > ${OUTPUT}/or/${PREFIX}_subset_enhancers_2_d100k_n.ard  
 fi
 
-if [ ${step3-0} == 1 ];then
+if [ ${SPATIAL-0} == 1 ];then
 
 	[ -s ${OUTPUT}/mmCIF ] || mkdir -p ${OUTPUT}/mmCIF
 	

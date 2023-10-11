@@ -1,7 +1,8 @@
 #!/bin/bash
 
 usage() {
-		cat <<-EOF
+	cat <<-EOF
+		RNAC_for_diploid.sh
 		Usage: `basename $0` 
 		Options:
 		    -g: genome.fa
@@ -9,6 +10,17 @@ usage() {
 		    -r: R2.fq
 		    -t: threads
 		    -h: help information
+		
+		Action:
+			-A: do alignment 
+			-P: extract contacts
+			-S: 3D genome structure reconstruction
+			-D: canonical Dip-C analysis
+			-R: analysis of expressed genes
+
+		See also:
+			Github repo: https://github.com/tanlongzhi/dip-c
+
 	EOF
 	exit 1;
 }
@@ -127,33 +139,33 @@ fi
 
 
 if [ ${MODEL-0} == 1 ];then
+	# submit jobs to slurm scheduler
+	echo $(date)
+	echo $OUTPUT
+	echo $PREFIX
 
-echo $(date)
-echo $OUTPUT
-echo $PREFIX
+	for rep in `seq 1 3`;do
+		sbatch -J $PREFIX -o $OUTPUT/logs/${PREFIX}_rep${rep}.log <<-EOF
+			#!/bin/bash
+			#SBATCH -c 1
+			#SBATCH -J $PREFIX
+			#SBATCH --mem 8G
+			#SBATCH -J ${PREFIX}_${rep}
+			#SBATCH --time 3-00:00:00
 
-for rep in `seq 4 5`;do
-sbatch -J $PREFIX -o $OUTPUT/logs/${PREFIX}_rep${rep}.log <<EOF
-#!/bin/bash
-#SBATCH -c 1
-#SBATCH -J $PREFIX
-#SBATCH --mem 8G
-#SBATCH -J ${PREFIX}_${rep}
-#SBATCH --time 3-00:00:00
+			hickit -s${rep} -M -i ${OUTPUT}/structure/${PREFIX}.impute.pairs.gz -Sr1m -c1 -r10m -c2 -b4m \
+				-b1m -O ${OUTPUT}/structure/${PREFIX}_1Mb_${rep}.3dg \
+				-b200k -O ${OUTPUT}/structure/${PREFIX}_200Kb_${rep}.3dg \
+				-D5 -b50k -O ${OUTPUT}/structure/${PREFIX}_50Kb_${rep}.3dg \
+				-D5 -b20k -O ${OUTPUT}/structure/${PREFIX}_20Kb_${rep}.3dg
 
-hickit -s${rep} -M -i ${OUTPUT}/structure/${PREFIX}.impute.pairs.gz -Sr1m -c1 -r10m -c2 -b4m \
-	-b1m -O ${OUTPUT}/structure/${PREFIX}_1Mb_${rep}.3dg \
-	-b200k -O ${OUTPUT}/structure/${PREFIX}_200Kb_${rep}.3dg \
-	-D5 -b50k -O ${OUTPUT}/structure/${PREFIX}_50Kb_${rep}.3dg \
-	-D5 -b20k -O ${OUTPUT}/structure/${PREFIX}_20Kb_${rep}.3dg
-
-# RESARR=("1Mb" "200Kb" "50Kb" "20Kb")
-# for RES in \${RESARR[@]};do
-#     # ${dipc}/hickit_3dg_to_3dg_rescale_unit.sh ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.3dg
-#     dip-c clean3 -c ${OUTPUT}/structure/impute.con.gz ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.dip-c.3dg > ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.clean.3dg
-# done
-EOF
-done
+			RESARR=("1Mb" "200Kb" "50Kb" "20Kb")
+			for RES in \${RESARR[@]};do
+			    ${dipc}/hickit_3dg_to_3dg_rescale_unit.sh ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.3dg
+			    dip-c clean3 -c ${OUTPUT}/structure/impute.con.gz ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.dip-c.3dg > ${OUTPUT}/structure/${PREFIX}_\${RES}_${rep}.clean.3dg
+			done
+		EOF
+	done
 
 fi
 
@@ -168,7 +180,7 @@ if [ ${DIPC-0} == 1 ];then
 		dip-c align -o $OUTPUT/alignment/bs_${RES}_ $OUTPUT/structure/*_${RES}_[1-3].clean.3dg 2>$OUTPUT/logs/${PREFIX}_rmsd_${RES}.logs > $OUTPUT/alignment/${PREFIX}_${RES}_rmsd.color 
 	done
 
-	# 3.2 (relate to Fig. S11. Tan et al., Science 2018)
+	# 3.2 (related to Fig. S11. Tan et al., Science 2018)
 	mkdir -p $OUTPUT/features
 
 	for RES in 200Kb 50Kb 20Kb;do
@@ -188,9 +200,6 @@ if [ ${DIPC-0} == 1 ];then
 		dip-c color -I3 -S 1000000  $S3 > $OUTPUT/features/${PREFIX}_${RES}_I3_S1mb.color
 		dip-c color -d3  $S3 > $OUTPUT/features/${PREFIX}_${RES}_d3.color 
 		dip-c color -r3 $S3 > $OUTPUT/features/${PREFIX}_${RES}_r3.color 
-
-		# imprinting ?
-		dip-c color -h $S3 > $OUTPUT/features/${PREFIX}_${RES}_h.color
 
 	done
 
@@ -224,15 +233,16 @@ if [ ${RNAC-0} == 1 ];then
 	
 	set -x 
 
-	###
-	### Expressed genes taken from corresponding RNA-seq dataset.
+	### 
+	### Expressed genes taken from corresponding RNA-seq dataset
+	### RSEM output format
 	### Expression value: log10(FPKM + 1)
 	### 
 
 	# gene's position
-	pos="/share/home/zhangjk/scRNAC/RNAC_Data/hg38/hg38.genes.coords.csv"
-	random_sampler="python /share/home/zhangjk/scRNAC/scripts/random_sampler.py"
-	inner_join="python /share/home/zhangjk/scRNAC/scripts/inner_join.py"
+	pos="data/hg38.genes.coords.csv"
+	random_sampler="python scripts/random_sampler.py"
+	inner_join="python scripts/inner_join.py"
 
 	[ -d $OUTPUT/genes ] || mkdir -p $OUTPUT/genes
 	mkdir -p $OUTPUT/visualization
@@ -244,9 +254,11 @@ if [ ${RNAC-0} == 1 ];then
 	## | 1st col | 2nd col | 3rd col | 4th col | 5th col |
 	## | gene_id | log10(FPKM) | chrom | tss | gene_name | 
 	
-	cat $OUTPUT/RNA/${PREFIX}.genes.results | cut -f1,7 | awk '(NR==1 || $2>1)' \
+	cat $OUTPUT/RNA/${PREFIX}.genes.results \
+		| cut -f1,7 | awk '(NR==1 || $2>1)' \
 		| tr '\t' ',' | ${inner_join} $pos /dev/stdin | tr ',' '\t' \
-		| tail -n+2 | sort -k3,3V -k4,4n | grep -v chrY | awk '{OFS="\t"}{print $1, log($2+1)/log(10), $3, $4, $5}' > $OUTPUT/genes/${PREFIX}.expr.genes.info.tsv
+		| tail -n+2 | sort -k3,3V -k4,4n \
+		| grep -v chrY | awk '{OFS="\t"}{print $1, log($2+1)/log(10), $3, $4, $5}' > $OUTPUT/genes/${PREFIX}.expr.genes.info.tsv
 	
 	### create leg (expressed)
 	awk 'BEGIN{FS="\t"}{print $5"(pat)"; print $5"(mat)"}' $OUTPUT/genes/${PREFIX}.expr.genes.info.tsv > $OUTPUT/genes/${PREFIX}.expr.genes.name
@@ -292,9 +304,12 @@ if [ ${RNAC-0} == 1 ];then
 	N=$(cat $OUTPUT/genes/${PREFIX}.expr.genes.info.tsv | wc -l)
 
 	### Random subset
-	( head -n1 $OUTPUT/RNA/${PREFIX}.genes.results && ${random_sampler} $OUTPUT/RNA/${PREFIX}.genes.results $N ) | cut -f1,7 | tr '\t' ',' \
-		| ${inner_join} $pos /dev/stdin | sed 's/"//g'  | tr ',' '\t' | tail -n+2 \
+	( head -n1 $OUTPUT/RNA/${PREFIX}.genes.results && ${random_sampler} $OUTPUT/RNA/${PREFIX}.genes.results $N ) \
+		| cut -f1,7 | tr '\t' ',' \
+		| ${inner_join} $pos /dev/stdin \
+		| sed 's/"//g'  | tr ',' '\t' | tail -n+2 \
 		| sort -k3,3V -k4,4n | grep -v chrY | awk '{OFS="\t"}{print $1, log($2+1)/log(10), $3, $4, $5}' > $OUTPUT/genes/${PREFIX}.random.run01.genes.tsv
+	
 	### format to leg
 	awk 'BEGIN{FS="\t"}{print $3","$4",0"; print $3","$4",1"}' $OUTPUT/genes/${PREFIX}.random.run01.genes.tsv > $OUTPUT/genes/${PREFIX}.random.run01.genes.leg
 	awk 'BEGIN{FS="\t"}{print $5"(pat)"; print $5"(mat)"}' $OUTPUT/genes/${PREFIX}.random.run01.genes.tsv > $OUTPUT/genes/${PREFIX}.random.run01.genes.name
@@ -328,6 +343,7 @@ if [ ${RNAC-0} == 1 ];then
 		mv ${f/.color/.tsv} $OUTPUT/features/
 		mv ${f/.color/.cif} $OUTPUT/visualization/
 	done
+
 	set +x
 fi
 

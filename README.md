@@ -1,1 +1,1 @@
-# LiMCA <img src="images/limca.png">
+# LiMCA <img src="images/limca.png" width="200"/>

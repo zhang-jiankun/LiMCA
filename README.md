@@ -1,4 +1,3 @@
 # LiMCA 
 
-
-<img src="images/limca.png" width="200"/>
+<img src="images/limca.png" width="275"/>

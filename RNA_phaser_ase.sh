@@ -14,7 +14,7 @@ sample=$4
 
 echo "[ $(date) ] Submit $cell: $array"
 phaser="/share/home/zhangjk/hic_tools/phaser"
-scripts="/share/home/zhangjk/scRNAC/MOE/scripts"
+scripts="scripts"
 GENES="/share/home/zhangjk/database/mouse/gencode.vM25.genes.bed"
 
 sbatch --array=$array <<-EOF

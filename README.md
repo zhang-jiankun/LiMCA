@@ -1,7 +1,5 @@
-# LiMCA 
+# LiMCA: **L**inking **m**RNA to **C**hromatin **A**rchitecture
 
 <img src="images/limca.png" width="275"/>
 
-## <a name="intro"></a> Introduction
-
-**L**inking **m**RNA to **C**hromatin **A**rchitecture (LiMCA) profiles transcriptome and 3D genome in single cells.
+This repository contains pipelines and scripts used for analyzing LiMCA data.

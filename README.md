@@ -7,8 +7,9 @@ LiMCA is a new single-cell sequencing method that can simultaneously profile the
 
 This repository contains data, scripts, pipelines used for LiMCA analysis.
 
-## Usage 
+## Workflow
 
+For analysis of scHi-C data, we encapsulated **hickit** and **dip-c** commands to creat the bash pipelines, **RNAC_for_diploid.sh** and **RNAC_for_olfactory.sh**. See the documentations of [hickit](https://github.com/lh3/hickit) and [dip-c](https://github.com/tanlongzhi/dip-c) for detailed, step-by-step instructions.
 
 
 

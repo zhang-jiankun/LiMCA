@@ -7,6 +7,13 @@ LiMCA is a new single-cell sequencing method that can simultaneously profile the
 
 This repository contains data, scripts, pipelines used for LiMCA analysis.
 
+## Features 
+
+Determine the spatial localizations of enhancers and active genes
+
+<img src="images/olfactory_nucleus.png" width="350"/><br>
+
+
 ## Workflow
 
 ### scRNA-seq analysis 

@@ -13,7 +13,7 @@ This repository contains data, scripts, pipelines used for LiMCA analysis.
 
 #### &#x2714; Basic analysis
 
-We followed the standard Smart-seq2 processing workflow documented in the Human Cell Atlas (HCA) Data Portal (https://data.humancellatlas.org/pipelines/smart-seq2-workflow).
+We followed the standard Smart-seq2 processing workflow documented in the Human Cell Atlas (HCA) Data Portal. For additional information and details on specific parameters, please refer to the [Smart-seq2 WDL Analysis Research Pipelines](https://broadinstitute.github.io/warp/docs/Pipelines/Smart-seq2_Single_Sample_Pipeline/README) and [HISAT2.wdl](https://github.com/HumanCellAtlas/skylab/blob/master/library/tasks/HISAT2.wdl). 
 
 #### &#x2714; Allele-specific gene expression from LiMCA 
 
@@ -71,4 +71,12 @@ Action:
 See also:
     GEO README (ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE121nnn/GSE121791/suppl/GSE121791%5F00README%2Emd%2Etxt)
 ```
+
+## Publication 
+
+1. Wu, H.\*, Zhang, J.\*, Jian, F.\* et al. Simultaneous single-cell three-dimensional genome and gene expression profiling uncovers dynamic enhancer connectivity underlying olfactory receptor choice. Nat Methods 21, 974–982 (2024). https://doi.org/10.1038/s41592-024-02239-0
+
+* Processed data: [GSE240128, GEO](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE240128)
+* Source data: [figshare](https://doi.org/10.6084/m9.figshare.24547162.v4)
+
 
